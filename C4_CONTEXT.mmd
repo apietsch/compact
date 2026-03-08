@@ -1,0 +1,16 @@
+C4Context
+title "System Context - HTTP Streaming Backpressure Demo"
+
+Person(dev, "Developer / Operator", "Starts ingestion, watches logs, switches strategy")
+System_Boundary(system, "Backpressure Demo System") {
+  System(sender, "sender-service", "Spring Boot WebFlux service that streams text chunks over HTTP")
+  System(receiver, "receiver-service", "Spring Boot WebFlux service that consumes stream and applies backpressure strategies")
+}
+System_Ext(docker, "Docker Compose", "Runs both services in one local network")
+System_Ext(logs, "Application Logs", "Operational log output for throughput, drops, and failures")
+
+Rel(dev, receiver, "Calls ingestion endpoints", "HTTP")
+Rel(receiver, sender, "Consumes chunked text stream", "HTTP chunked")
+Rel(dev, docker, "Builds/starts stack", "CLI")
+Rel(sender, logs, "Writes sender stream logs", "SLF4J")
+Rel(receiver, logs, "Writes receiver processing logs", "SLF4J")

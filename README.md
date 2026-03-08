@@ -38,6 +38,14 @@ mvn -pl receiver-service spring-boot:run
 docker compose up --build
 ```
 
+## Architekturdiagramm
+
+Ein C4-Diagramm (Level 1 und Level 2) findest du hier:
+
+- [C4_DIAGRAM.md](./C4_DIAGRAM.md)
+- [C4_CONTEXT.mmd](./C4_CONTEXT.mmd)
+- [C4_CONTAINER.mmd](./C4_CONTAINER.mmd)
+
 ## Nächste Schritte
 
 Die Projektstruktur und ein erstes lauffaehiges Grundgeruest sind vorhanden. Fachliche Feinheiten und weitere Tests koennen darauf aufbauen.

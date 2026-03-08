@@ -1,0 +1,20 @@
+C4Container
+title "Container View - sender-service and receiver-service"
+
+Person(dev, "Developer / Operator", "Uses API endpoints and runtime configuration")
+System_Ext(logs, "Application Logs", "Text logs for runtime behavior")
+
+System_Boundary(system, "Backpressure Demo System") {
+  Container(receiverApi, "Receiver API", "Spring WebFlux REST", "POST /api/ingestion/start, POST /api/ingestion/stop, GET /api/ingestion/status")
+  Container(receiverEngine, "Ingestion Engine", "Reactor Flux Pipeline", "Applies limitRate, buffer/drop/latest strategies and per-chunk processing delay")
+  Container(senderApi, "Sender API", "Spring WebFlux REST", "GET /api/stream (text/plain chunked), GET /api/health")
+  Container(senderEngine, "Stream Generator", "Reactor Flux Producer", "Generates sequential text chunks with timestamp and payload")
+}
+
+Rel(dev, receiverApi, "Controls ingestion", "HTTP")
+Rel(receiverApi, receiverEngine, "Starts/stops stream subscriptions", "In-process")
+Rel(receiverEngine, senderApi, "Requests stream", "HTTP GET /api/stream")
+Rel(senderApi, senderEngine, "Delegates chunk generation", "In-process")
+Rel(senderEngine, receiverEngine, "Streams text chunks", "HTTP chunked response")
+Rel(senderEngine, logs, "Logs emitted chunks and lifecycle", "SLF4J")
+Rel(receiverEngine, logs, "Logs processed/dropped chunks and lifecycle", "SLF4J")
