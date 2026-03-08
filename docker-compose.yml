@@ -1,0 +1,30 @@
+services:
+  sender-service:
+    build:
+      context: .
+      dockerfile: sender-service/Dockerfile
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      STREAM_CHUNK_COUNT: 10000
+      STREAM_CHUNK_INTERVAL_MS: 10
+      STREAM_PAYLOAD_SIZE: 64
+      STREAM_INFINITE: "false"
+
+  receiver-service:
+    build:
+      context: .
+      dockerfile: receiver-service/Dockerfile
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SENDER_BASE_URL: http://sender-service:8081
+      INGESTION_PROCESSING_DELAY_MS: 200
+      INGESTION_LIMIT_RATE: 32
+      INGESTION_BUFFER_SIZE: 128
+      INGESTION_STRATEGY: BUFFER
+      INGESTION_REQUEST_TIMEOUT: PT30S
+    depends_on:
+      - sender-service

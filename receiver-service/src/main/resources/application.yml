@@ -1,0 +1,20 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: receiver-service
+
+sender:
+  base-url: http://localhost:8081
+
+ingestion:
+  processing-delay-ms: 200
+  limit-rate: 32
+  buffer-size: 128
+  strategy: BUFFER
+  request-timeout: PT30S
+
+logging:
+  level:
+    dev.compact.receiver: INFO

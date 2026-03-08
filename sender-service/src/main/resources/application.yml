@@ -1,0 +1,16 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: sender-service
+
+stream:
+  chunk-count: 10000
+  chunk-interval-ms: 10
+  payload-size: 64
+  infinite: false
+
+logging:
+  level:
+    dev.compact.sender: INFO
