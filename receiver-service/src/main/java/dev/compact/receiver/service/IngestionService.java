@@ -12,6 +12,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Disposable;
+import reactor.core.Disposables;
 import reactor.core.publisher.Flux;
 
 @Service
@@ -22,7 +23,7 @@ public class IngestionService {
     private final WebClient webClient;
     private final IngestionProperties ingestionProperties;
     private final SenderProperties senderProperties;
-    private final AtomicReference<Disposable> runningSubscription = new AtomicReference<>();
+    private final AtomicReference<Disposable.Swap> runningSubscription = new AtomicReference<>();
     private final AtomicReference<IngestionStatus> status = new AtomicReference<>();
 
     public IngestionService(
@@ -56,6 +57,8 @@ public class IngestionService {
         Flux<String> configured = applyStrategy(source, strategy, droppedCounter)
                 .concatMap(chunk -> processChunk(streamId, chunk, strategy, processedCounter));
 
+        Disposable.Swap subscriptionSlot = Disposables.swap();
+        runningSubscription.set(subscriptionSlot);
         status.set(new IngestionStatus(true, streamId, strategy, 0, 0, streamUrl()));
         Disposable subscription = configured.subscribe(
                 chunk -> status.set(new IngestionStatus(
@@ -74,7 +77,7 @@ public class IngestionService {
                             processedCounter.get(),
                             droppedCounter.get(),
                             streamUrl()));
-                    runningSubscription.set(null);
+                    clearRunningSubscription(subscriptionSlot);
                 },
                 () -> {
                     log.info("receiver streamId={} completed processed={} dropped={}",
@@ -88,16 +91,16 @@ public class IngestionService {
                             processedCounter.get(),
                             droppedCounter.get(),
                             streamUrl()));
-                    runningSubscription.set(null);
+                    clearRunningSubscription(subscriptionSlot);
                 });
 
-        runningSubscription.set(subscription);
+        subscriptionSlot.update(subscription);
         log.info("receiver streamId={} started strategy={} sourceUrl={}", streamId, strategy, streamUrl());
         return status.get();
     }
 
     public synchronized IngestionStatus stop() {
-        Disposable subscription = runningSubscription.getAndSet(null);
+        Disposable.Swap subscription = runningSubscription.getAndSet(null);
         if (subscription != null) {
             subscription.dispose();
         }
@@ -132,7 +135,7 @@ public class IngestionService {
                 droppedCounter.incrementAndGet();
                 log.warn("receiver dropped chunk={}", preview(chunk));
             });
-            case LATEST -> source.onBackpressureLatest();
+            case LATEST -> applyLatestStrategy(source, droppedCounter);
         };
     }
 
@@ -160,6 +163,26 @@ public class IngestionService {
 
     private String streamUrl() {
         return senderProperties.getBaseUrl() + "/api/stream";
+    }
+
+    private void clearRunningSubscription(Disposable.Swap subscriptionSlot) {
+        runningSubscription.compareAndSet(subscriptionSlot, null);
+        subscriptionSlot.dispose();
+    }
+
+    private Flux<String> applyLatestStrategy(Flux<String> source, AtomicLong droppedCounter) {
+        AtomicLong lastDeliveredIndex = new AtomicLong(-1);
+        return source.index()
+                .onBackpressureLatest()
+                .doOnNext(indexedChunk -> {
+                    long previousIndex = lastDeliveredIndex.getAndSet(indexedChunk.getT1());
+                    long dropped = indexedChunk.getT1() - previousIndex - 1;
+                    if (dropped > 0) {
+                        droppedCounter.addAndGet(dropped);
+                        log.warn("receiver latest dropped={} chunk={}", dropped, preview(indexedChunk.getT2()));
+                    }
+                })
+                .map(indexedChunk -> indexedChunk.getT2());
     }
 
     private String preview(String chunk) {
